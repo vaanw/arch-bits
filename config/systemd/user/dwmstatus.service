@@ -1,0 +1,6 @@
+[Unit]
+Description=Update dwm status text
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dwmstatus

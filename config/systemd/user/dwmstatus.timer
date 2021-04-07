@@ -1,0 +1,7 @@
+[Unit]
+Description=Run dwmstatus every minute
+
+[Timer]
+OnActiveSec=0
+OnCalendar=*:*:0/10
+AccuracySec=1

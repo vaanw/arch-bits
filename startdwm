@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+eval $(ssh-agent)
+systemctl --user start dwmstatus.timer
+
+while true; do
+	dwm 2> ~/.dwm.log
+done

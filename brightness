@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+step=10
+
+for arg in "$@"
+do
+	case $arg in
+		--increment | -i)
+			sudo light -A $step
+			;;
+		--decrement | -d)
+			sudo light -U $step
+	esac
+	shift
+done

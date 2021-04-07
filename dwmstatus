@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+padding="  "
+delimiter=" | "
+
+datetime="$(date +"%a %F %I:%M:%S")"
+# Last digit of time substituted due to 10s timer interval
+datetime=${datetime%?}X
+
+bat_status=$(</sys/class/power_supply/BAT0/status)
+bat_cap=$(</sys/class/power_supply/BAT0/capacity)
+bat_energy_now=$(</sys/class/power_supply/BAT0/energy_now)
+bat_energy_full=$(</sys/class/power_supply/BAT0/energy_full)
+bat_power=$(</sys/class/power_supply/BAT0/power_now)
+
+# If battery power is unknown then time remaining cannot be calculated
+if ((bat_power != 0)); then
+
+	if [ $bat_status = "Discharging" ]; then
+		bat_rem=$bat_energy_now
+		charge_symbol="-"
+	else
+		bat_rem=$((bat_energy_full-bat_energy_now))
+		charge_symbol="+"
+	fi
+	bat_time_hr=$((bat_rem/bat_power))
+	# 100 used to preserve integer division precision
+	bat_time_min=$(((100*bat_rem/bat_power)%100*60/100))
+	bat_time=$(printf "%02d:%02d" $bat_time_hr $bat_time_min)
+	battery="$bat_cap% $charge_symbol $bat_time"
+
+else
+	battery=$bat_cap%
+fi
+
+data=("$battery" "$datetime")
+result=()
+
+# Insert delimiters between sections
+for index in "${!data[@]}"
+do
+	result+=${data[$index]}
+	if ((index != ${#data[@]}-1)); then
+		result+=$delimiter
+	fi
+done
+
+# Add outer padding to result string
+result="${padding}${result}${padding}"
+xsetroot -name "$result"

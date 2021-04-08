@@ -1,0 +1,215 @@
+#### Setup Guide:
+### Dual Boot Arch and Windows on ThinkPad X390
+### Arch Linux 5.4.8, Windows 8/10 
+##
+## Super light bare-bones setup ThinkPad X390 (Tested), X395 (Untested)
+## Should be easily adapted to other ThinkPads > laptops > computers
+##
+## Arch performance on new ThinkPad x390:
+## Runs luke cool, no fan
+## Several (~8+) hours of battery life on full in Arch
+
+# https://wiki.archlinux.org/index.php/installation_guide
+
+### Install Windows:
+
+## Install Windows first
+# leave room for Arch + Swap partitions, maybe 40GB + ramSizeGB for Swap
+# Or just use entire disk now and shrink within Windows later (easy, not covered here)
+
+# Launch Windows then Disable Fast Startup
+# Control Panel\All Control Panel Items\Power Options\System Settings
+# Pitfall: Top -> Change settings that are currently unavailable
+
+## Prep Arch USB
+# Download Arch ISO torrent or whatevs
+# Create USB Media somehow
+# Suggested: use Rufus in Windows, copy ISO>USB in ISO Mode
+
+## Boot from USB
+
+# Disable Secure Boot in Bios
+# Hold F1 (bios setup)
+# Security -> Secure Boot -> Disabled
+# F10 (save) -> Yes
+
+# Hold F12 (boot menu)
+# Select USB device with Arch ISO
+
+### BOOT FROM USB, SUCCESSFUL!!?
+
+
+## Setup Wireless
+
+# Start iwd.service
+systemctl start iwd
+
+# Start interactive iwd prompt
+iwctl
+
+# Find wireless device name
+[iwd]# device list
+
+# Find wireless network name
+[iwd]# station your_device get-networks
+
+# Connect to the wireless network
+[iwd]# station your_device connect your_network
+
+# Exit iwd interactive prompt
+[iwd]# exit
+
+# Start DHCP
+dhcpcd
+
+# Test connection
+ping archlinux.org -c 4
+
+
+## Partition
+
+# list block devices 
+lsblk [-f]
+# -f: Output info about filesystems
+
+# list available ram space in MiB
+free -m 
+
+# GNU Parted for creating and manipulating partition tables
+parted /dev/nvme0n1
+# (parted) select /dev/nvme0n1 #If opened without selecting device
+#| (parted) unit MiB print free
+
+# Start of Free    :221700 MB
+# End of Free      :256060 MB
+# Desired Swap Space: 8GiB
+# (parted) mkpart part-type fs-type start end
+# (parted) mkpart logical ext4 221700MB 248,060‬MB
+# (parted) mkpart primary linux-swap 248,060‬MB 256,060MB
+
+#| (parted) mkpart
+#| "arch_os"
+#| ext4 
+#| 221700MB
+#| 248060‬MB
+
+#| (parted) mkpart
+#| "arch_swap"
+#| linux-swap 
+#| 248060‬MB
+#| 256060MB
+
+# Exit
+quit
+
+
+## Mount Swap, /mnt, /boot
+
+# Initialize swap
+mkswap /dev/nvme0n1p6
+swapon /dev/nvme0n1p6
+
+#Build ext4 root Arch Linux file system
+mkfs.ext4 /dev/nvme0n1p5
+#Mount the root file system
+mount /dev/nvme0n1p5 /mnt
+
+#Mount Windows EFI boot partition
+mkdir /mnt/boot
+mount /dev/nvme0n1p2 /mnt/boot
+
+## Installation
+# Install core essentials: base, linux kernel and firmware for common hardware
+pacstrap /mnt base linux linux-firmware
+
+# Generate an fstab file
+mkdir /mnt/etc
+touch /mnt/etc/fstab
+genfstab -U /mnt >> /mnt/etc/fstab
+
+#Change root into the new system
+arch-chroot /mnt
+
+# Set root password:
+passwd
+
+# Download pacman database files:
+pacman -Fy
+
+# Install peripheral and utility essentials: Microcode, DHCP, WiFi, text editor, etc
+# With pacman, not pacstrap this time, since now we have base
+pacman -S intel-ucode [/amd-ucode] dhcpcd iwd vim 
+# Check installed packages
+pacman -Qqe
+
+
+## Create Boot Loader
+# https://wiki.archlinux.org/index.php/Systemd-boot#Installing_the_EFI_boot_manager
+
+#Confirm booting UEFI mode
+ls /sys/firmware/efi/efivars
+
+#Install new Boot Loader (systemd-boot for simplicity)
+bootctl --path=/boot install
+
+# Create systemd-boot loader configuration files: loader.conf, arch.conf
+
+# loader.conf really just needs a timeout, 3 seconds used here
+echo timeout 3 > /boot/loader/loader.conf
+# You can set Default OS from within the Boot Loader itself later on
+
+# arch.conf needs a few entries,
+# arguments were earlier installed with Microcode package
+vim /boot/loader/entries/arch.conf
+
+# Vim -> 
+# Insert: "i"
+# _____________________________________
+# | title   Arch Linux
+# | linux   /vmlinuz-linux
+# | initrd  /intel-ucode.img 
+# | # initrd  /amd-ucode.img
+# | initrd  /initramfs-linux.img
+# | # Arch root partition, rw: read-write
+# | options root=/dev/nvme0n1p5 rw
+# | ~
+# | ~
+# | ~
+# _____________________________________
+# 'Esc'
+# Save: ":wq"
+
+# Confirm loader entries is recognized
+bootctl status
+
+# bootctl must be used to update systemd-boot
+bootctl update
+
+###
+### REBOOT FINALLY
+###
+
+### Extras:
+
+## Change default Boot Loader option
+# press 'd' during Boot Menu
+
+# Resolving a pacman package conflict with extreme prejudice
+# pacman -Syu intel-ucode --overwrite '*'
+
+setfont 
+
+
+### Gnome 3
+pacman -S gnome gdm #Takes a while
+ls 
+
+# LAUNCH GNOME WITH GDM NEXT STEP
+
+# USER ACCOUNT SECURITY STUFF
+
+useradd -m new-user
+passwd new-user
+
+
+
